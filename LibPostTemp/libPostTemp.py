@@ -6,12 +6,8 @@ import json
 
 
 class TempReport:
-    def __init__(self, studentCookies, userId, fromDate, toDate=datetime.today()):
+    def __init__(self, studentCookies):
         self.studentCookies = studentCookies
-        self.userId         = userId
-        self.fromDate       = fromDate
-        self.toDate         = toDate
-        self.days           = (toDate - datetime.strptime(fromDate, "%Y-%m-%d")).days
         self.allTempUrl     = 'https://ehall.hainanu.edu.cn/qljfwapp/sys/lwHainanuStuTempReport/mobile/stuTempReport/getStuTempReportData.do'
         self.postTempUrl    = 'https://ehall.hainanu.edu.cn/qljfwapp/sys/lwHainanuStuTempReport/mobile/stuTempReport/T_STU_TEMP_REPORT_MODIFY.do?'
         self.headers        = {
@@ -19,25 +15,34 @@ class TempReport:
             "Content-Length": "77",
             "Content-Type": "application/x-www-form-urlencoded"
         }
-        self.data = ""    + \
-            "USER_ID="    + self.userId                      + "&" + \
-            "pageNumber=" + "1"                              + "&" + \
-            "pageSize="   + str(self.days)                   + "&" + \
-            "KSRQ="       + self.fromDate                    + "&" + \
-            "JSRQ="       + self.toDate.strftime("%Y-%m-%d") + "&"
+        
 
-
-    def getTempInfo(self, state):
+    # 获取指定的体温上报信息
+    def getTempInfo(self, state, userId, fromDate="2021-03-01", toDate=datetime.today()):
+        days = (toDate - datetime.strptime(fromDate, "%Y-%m-%d")).days
+        data = ""    + \
+            "USER_ID="    + str(userId)                 + "&" + \
+            "pageNumber=" + "1"                         + "&" + \
+            "pageSize="   + str(days)                   + "&" + \
+            "KSRQ="       + fromDate                    + "&" + \
+            "JSRQ="       + toDate.strftime("%Y-%m-%d") + "&"
         allDays = json.loads(
-            requests.post(self.allTempUrl, headers=self.headers, data=self.data, cookies=self.studentCookies).text)
+            requests.post(self.allTempUrl, headers=self.headers, data=data, cookies=self.studentCookies).text)
         tempInfo = []
+
         for rows in allDays["datas"]["getStuTempReportData"]["rows"]:
-            if rows["STATE"] == state:
+            if state == "ALL":
+                tempInfo.append(rows)
+            elif rows["STATE"] == state:
                 tempInfo.append(rows)
         return tempInfo
 
 
-    def postTemp(self, notReportInfo, location="海南省海口市美兰区云翮南路", hms="22:00:00", state="YES", temp="37.3°C以下", display="是"):
+    def postTemp(self, notReportInfo, changeInfo=None, location="海南省海口市美兰区云翮南路", hms="22:00:00", state="YES", temp="37.3°C以下", display="是"):
+        if changeInfo is not None:
+            for i in changeInfo:
+                notReportInfo[i] = changeInfo[i]
+
         postUrl = str(self.postTempUrl) + \
             "WID="                      + str(notReportInfo["WID"])                         + "&" + \
             "LOCATION_DETAIL="          + str(location)                                     + "&" + \
@@ -70,11 +75,11 @@ class TempReport:
         return rsp
 
 
-    def reportAll(self, state):
-        notReportTempInfo = self.getTempInfo(state)
+    def reportAll(self, state, userId, changeInfo=None):
+        notReportTempInfo = self.getTempInfo(state, userId)
         fail = []
         for oneDayTempInfo in notReportTempInfo:
-            tempRespond = self.postTemp(oneDayTempInfo)
+            tempRespond = self.postTemp(oneDayTempInfo, changeInfo)
             if tempRespond.text != '{"datas":{"T_STU_TEMP_REPORT_MODIFY":1},"code":"0"}':
                 fail += oneDayTempInfo["CHECK_DATE"]
         return fail

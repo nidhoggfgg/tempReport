@@ -6,6 +6,12 @@ from Crypto.Cipher import AES
 
 
 class Encrypt:
+    """
+    AES 加密
+    仿造了网页上的加密
+    具体算法为特殊的64字节随机值+加密内容+填充然后进行AES-CBC模式加密，最后url编码
+    iv不影响有效加密内容的解密，iv只影响解密后的第一个块
+    """
     def __init__(self, data, salt, iv='6' * 16, chars="ABCDEFGHJKMNPQRSTWXYZabcdefhijkmnprstwxyz2345678", randomStringLen=64, charset="utf-8"):
         self.charset   = charset
         self.salt      = salt.encode(self.charset)
